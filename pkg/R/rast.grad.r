@@ -26,9 +26,9 @@ rast.grad=function(rasterstack){
     X.grad.y=cbind(X.grad.y,values(grad.y))  
   }
   X.grad.x=X.grad.x[,-1]
-  colnames(X.grad.x) <- layerNames(rasterstack)
+  colnames(X.grad.x) <- names(rasterstack)
   X.grad.y=X.grad.y[,-1]
-  colnames(X.grad.y) <- layerNames(rasterstack)
+  colnames(X.grad.y) <- names(rasterstack)
   rasterexample=rasterstack[[1]]
   }
   if(class(rasterstack)=="RasterLayer"){
