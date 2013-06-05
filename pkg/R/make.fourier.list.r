@@ -1,4 +1,4 @@
-make.spline.list <- function(mintime,maxtime,knot.intervals.list,spl.option.idx=NA,...){
+make.fourier.list <- function(mintime,maxtime,nbasis.list,spl.option.idx=NA,...){
 
   ## Last Updated 20120716
   ##
@@ -16,18 +16,18 @@ make.spline.list <- function(mintime,maxtime,knot.intervals.list,spl.option.idx=
   ##   knot.intervals.list, with one 'fda' basis object per list entry
   ##
 
-  if(class(knot.intervals.list)=="list"){
+  if(class(nbasis.list)=="list"){
     p.list=list()
-    for(i in 1:length(knot.intervals.list)){
-      p.list[[i]]=length(knot.intervals.list[[i]])
+    for(i in 1:length(nbasis.list)){
+      p.list[[i]]=length(nbasis.list[[i]])
     }
   }else{
-    if(class(knot.intervals.list)=="numeric"){
+    if(class(nbasis.list)=="numeric"){
       p.list=list()
-      p.list[[1]]=length(knot.intervals.list)
-      knot.intervals.list=list(knot.intervals.list)
+      p.list[[1]]=length(nbasis.list)
+      nbasis.list=list(nbasis.list)
     }else{
-      cat("knot.intervals.list must be either a numeric vector or a list of numeric vectors")
+      cat("nbasis.list must be either a numeric vector or a list of numeric vectors")
     }
   }
 
@@ -40,16 +40,11 @@ make.spline.list <- function(mintime,maxtime,knot.intervals.list,spl.option.idx=
   for(j in 1:length(p.list)){
     if(p.list[[j]]>0){
       for(i in 1:p.list[[j]]){
-        if(knot.intervals.list[[j]][i]>0){
-          knots=seq(mintime,maxtime,knot.intervals.list[[j]][i])
-          if(knots[length(knots)]<maxtime){
-            knots=c(knots,maxtime)
-          }
-          spline.knots.list[[length(spline.knots.list)+1]]=knots
+        if(nbasis.list[[j]][i]>0){
           if(spl.option.idx==j){
-            spline.list[[length(spline.list)+1]]=create.bspline.basis(rangeval=c(mintime,maxtime),breaks=spline.knots.list[[length(spline.knots.list)]],...)
+            spline.list[[length(spline.list)+1]]=create.fourier.basis(rangeval=c(mintime,maxtime),nbasis=nbasis.list[[j]][i],...)
           }else{
-            spline.list[[length(spline.list)+1]]=create.bspline.basis(rangeval=c(mintime,maxtime),breaks=spline.knots.list[[length(spline.knots.list)]])
+            spline.list[[length(spline.list)+1]]=create.fourier.basis(rangeval=c(mintime,maxtime),nbasis=nbasis.list[[j]][i])
           }
         }else{
           spline.knots.list[[length(spline.knots.list)+1]]=NA

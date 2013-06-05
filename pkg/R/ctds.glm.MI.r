@@ -1,4 +1,4 @@
-ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=TRUE,method="Stacked.cv",cv.param="min",...){
+ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=FALSE,method="Stacked.cv",cv.param="min",...){
 
   ## Last Updated: 20120716
   ##
@@ -46,9 +46,17 @@ ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=TRUE,method="Stac
     ## fix for times outside of observation window
     Phi[which(is.na(Phi))] <- 0
 
+    Phi.mean=apply(Phi,2,mean)
+    Phi.sd=apply(Phi,2,sd)
+    Phi.scaled=scale(Phi)
+    #for(r in 1:nrow(Phi)){
+    #  Phi.scaled[,r]=(Phi[,r]-Phi.mean[r])/Phi.sd[r]
+    #}
+
     cat("Fitting GLM with Lasso Penalty Chosen Via Cross-Validation")
     
-    glm.out=cv.glmnet(Phi,z,family="poisson",offset=log(tau),exclude=zero.idx,nfolds=nfolds,nlambda=nlambda,...)
+    glm.out=cv.glmnet(Phi.scaled,z,family="poisson",offset=log(tau),exclude=zero.idx,nfolds=nfolds,nlambda=nlambda,standardize=F,...)
+    #glm.out=cv.glmnet(Phi,z,family="poisson",offset=log(tau),exclude=zero.idx,nfolds=nfolds,nlambda=nlambda,...)
     if(plot.cv==TRUE){
       plot(glm.out)
     }
@@ -70,7 +78,7 @@ ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=TRUE,method="Stac
     alpha.hat[nonzero.coeffs]=coeffs[-1]
     alpha.hat
     
-    out=list(Phi=Phi,z=z,tau=tau,zero.idx=zero.idx,nfolds=nfolds,nlambda=nlambda,alpha=alpha.hat,intercept=intercept.hat,lambda.best=lambda.pen,alpha.nonzero.proportion=nonzero.ratio,glmnet.out=glm.out,beta.names=ctds.obj$beta.names)
+    out=list(Phi=Phi,z=z,tau=tau,zero.idx=zero.idx,nfolds=nfolds,nlambda=nlambda,alpha=alpha.hat,intercept=intercept.hat,lambda.best=lambda.pen,alpha.nonzero.proportion=nonzero.ratio,glmnet.out=glm.out,beta.names=ctds.obj$beta.names,Phi.mean=Phi.mean,Phi.sd=Phi.sd)
   }
   if(method=="MI"){
     #browser()
@@ -101,7 +109,7 @@ ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=TRUE,method="Stac
     }
     alpha=apply(alpha.mat,2,mean,na.rm=T)
     alpha.sd=sqrt(apply(alpha.var.mat,2,mean,na.rm=T)+apply(alpha.mat,2,var,na.rm=T))
-    out=list(intercept=alpha[1],intercept.sd=alpha.sd[1],alpha=alpha[-1],alpha.sd=alpha.sd[-1],alpha.list=alpha.list)
+    out=list(intercept=alpha[1],intercept.sd=alpha.sd[1],alpha=alpha[-1],alpha.sd=alpha.sd[-1],alpha.list=alpha.list,beta.names=ctds.obj$beta.names,Phi.mean=NA,Phi.sd=NA)
   }
   out
 }

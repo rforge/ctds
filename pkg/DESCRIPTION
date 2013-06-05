@@ -1,11 +1,11 @@
 Package: ctds
-Version: 0.2.2
-Date: 2013-04-17
+Version: 0.2.3
+Date: 2013-06-05
 Title: Continuous-Time Discrete-Space Movement Models
 Authors@R: c(person("Ephraim", "Hanks", role = c("aut", "cre"),email = "hanks@stat.colostate.edu"))
 Author: Ephraim M. Hanks
 Maintainer: Ephraim M. Hanks <hanks@stat.colostate.edu>
-Depends: R (>= 1.8.0), raster, crawl, fda, Matrix, glmnet
+Depends: R (>= 1.8.0), raster, crawl, fda, Matrix, glmnet, statmod
 Description: Functions to fit continuous-time, discrete-space models to animal telemetry data. 
 License: GPL (>= 2)
 URL: http://www.r-project.org, http://www.another.url

@@ -122,7 +122,7 @@ make.Phi.mat <- function(sim.obj,spline.list,stack.static,stack.grad,other.sim.l
   }else{
     X.static=matrix(values(stack.static)[start.cells],ncol=1)
   }
-  colnames(X.static) <- layerNames(stack.static)
+  colnames(X.static) <- names(stack.static)
   
   ##
   ## Get x values for gradiant covariates

@@ -19,7 +19,9 @@ ctds.MI.prep <- function(sim.obj,spline.list,stack.static,stack.grad,conspecific
   XX.list=list()
   tau.list=list()
   crawl.list=list()
- 
+  source("rast.grad.r")
+  source("make.Phi.mat.r")
+
   cat("Computing Discrete Space Paths ")
 
   ##browser()

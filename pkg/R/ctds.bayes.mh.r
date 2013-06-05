@@ -30,7 +30,7 @@ ctds.bayes.mh <- function(sim.obj,spline.list,stack.static,stack.grad,conspecifi
   
   for(iter in 1:n.mcmc){
 
-    cat(iter)
+    cat(iter," ")
 
     #browser()
 
@@ -63,7 +63,7 @@ ctds.bayes.mh <- function(sim.obj,spline.list,stack.static,stack.grad,conspecifi
       accept=accept+1
     }
 
-    cat("(",accept,") ")
+    #cat("(",accept,") ")
     
 
     alpha.save[iter,] <- alpha
@@ -71,5 +71,7 @@ ctds.bayes.mh <- function(sim.obj,spline.list,stack.static,stack.grad,conspecifi
   }
   alpha=apply(alpha.save,2,mean)
   alpha.sd=apply(alpha.save,2,sd)
-  list(alpha=alpha,alpha.sd=alpha.sd,alpha.save=alpha.save,intercept.save=intercept.save,accept=accept)
+  int=mean(intercept.save)
+  int.sd=sd(intercept.save)
+  list(alpha=alpha,alpha.sd=alpha.sd,alpha.save=alpha.save,intercept=int,intercept.sd=int.sd,intercept.save=intercept.save,accept=accept)
 }
