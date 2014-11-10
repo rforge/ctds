@@ -68,8 +68,9 @@ ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=FALSE,method="Sta
     if(cv.param=="1se"){
       lambda.pen=glm.out$lambda.1se
     }
+    ##browser()
     coeffs=predict(glm.out,s=lambda.pen,type="coefficients")@x
-    nonzero.coeffs=predict(glm.out,s=lambda.pen,type="nonzero")
+    nonzero.coeffs=predict(glm.out,s=lambda.pen,type="nonzero")[[1]]
     nonzero.ratio=length(nonzero.coeffs)/ncol(Phi)
     nonzero.ratio
     alpha.hat=coeffs[-1]
@@ -109,7 +110,7 @@ ctds.glm.MI <- function(ctds.obj,nfolds=10,nlambda=100,plot.cv=FALSE,method="Sta
     }
     alpha=apply(alpha.mat,2,mean,na.rm=T)
     alpha.sd=sqrt(apply(alpha.var.mat,2,mean,na.rm=T)+apply(alpha.mat,2,var,na.rm=T))
-    out=list(intercept=alpha[1],intercept.sd=alpha.sd[1],alpha=alpha[-1],alpha.sd=alpha.sd[-1],alpha.list=alpha.list,beta.names=ctds.obj$beta.names,Phi.mean=NA,Phi.sd=NA)
+    out=list(Phi=Phi,intercept=alpha[1],intercept.sd=alpha.sd[1],alpha=alpha[-1],alpha.sd=alpha.sd[-1],alpha.list=alpha.list,beta.names=ctds.obj$beta.names,Phi.mean=NA,Phi.sd=NA)
   }
   out
 }

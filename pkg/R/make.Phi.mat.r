@@ -1,4 +1,4 @@
-make.Phi.mat <- function(sim.obj,spline.list,stack.static,stack.grad,other.sim.list=list(),crw=TRUE,normalize.gradients=TRUE,grad.point.decreasing=TRUE,path.aug.interval=0,spline.period=0){
+make.Phi.mat <- function(sim.obj,spline.list,stack.static,stack.grad,other.sim.list=list(),crw=TRUE,normalize.gradients=TRUE,grad.point.decreasing=TRUE,path.aug.interval=0,spline.period=0,imputation.model="CRAWL"){
 
   if(spline.period==0){
     mintime=spline.list[[1]]$rangeval[1]
@@ -41,45 +41,63 @@ make.Phi.mat <- function(sim.obj,spline.list,stack.static,stack.grad,other.sim.l
     examplerast=stack.static
   }
 
-  #browser()
+##  browser()
 
-  keep.idx=0
-    while(keep.idx==0){
-      samp.new <- crwPostIS(sim.obj, fullPost=FALSE)
-      if(path.aug.interval>0){
-        #browser()
-        xvals=samp.new$alpha.sim.x[t.idx,'mu']
-        yvals=samp.new$alpha.sim.y[t.idx,'mu']
-        taug=seq(mintime,maxtime,by=path.aug.interval)
-        xaug=approx(t,xvals,xout=taug)$y
-        yaug=approx(t,yvals,xout=taug)$y
-        na.idx=unique(c(which(is.na(xaug)),which(is.na(yaug))))
-        if(length(na.idx)>0){
-          path.list=cbind(xaug,yaug)[-na.idx,]
-          taug=taug[-na.idx]
-        }else{
-          path.list=cbind(xaug,yaug)
-          taug=taug
-        }
-      }else{
-        path.list=cbind(samp.new$alpha.sim.x[t.idx,'mu'], samp.new$alpha.sim.y[t.idx,'mu'])
-        taug=t
+  if(imputation.model=="CRAWL"){
+      keep.idx=0
+      while(keep.idx==0){
+          samp.new <- crwPostIS(sim.obj, fullPost=FALSE)
+          if(path.aug.interval>0){
+                                        #browser()
+              xvals=samp.new$alpha.sim.x[t.idx,'mu']
+              yvals=samp.new$alpha.sim.y[t.idx,'mu']
+              taug=seq(mintime,maxtime,by=path.aug.interval)
+              xaug=approx(t,xvals,xout=taug)$y
+              yaug=approx(t,yvals,xout=taug)$y
+              na.idx=unique(c(which(is.na(xaug)),which(is.na(yaug))))
+              if(length(na.idx)>0){
+                  path.list=cbind(xaug,yaug)[-na.idx,]
+                  taug=taug[-na.idx]
+              }else{
+                  path.list=cbind(xaug,yaug)
+                  taug=taug
+              }
+          }else{
+              path.list=cbind(samp.new$alpha.sim.x[t.idx,'mu'], samp.new$alpha.sim.y[t.idx,'mu'])
+              taug=t
+          }
+          path.loc.idx=cellFromXY(examplerast,path.list)
+          if(length(which(is.na(path.loc.idx)))==0){
+              keep.idx=1
+          }
       }
-      path.loc.idx=cellFromXY(examplerast,path.list)
-      if(length(which(is.na(path.loc.idx)))==0){
-        keep.idx=1
-      }
-    }
+      locs.idx <- cumsum(c(TRUE,diff(path.loc.idx)!=0))
+      ##first.idx=c(1,which(diff(path.loc.idx)!=0))
+      first.idx=which(diff(path.loc.idx)!=0)
+      start.times=taug[first.idx[-length(first.idx)]]
+      end.times=taug[first.idx[-1]]
+      wait.times=end.times-start.times
+      locs=path.loc.idx[first.idx[-length(first.idx)]]
+      
+  }
+  if(imputation.model=="BB"){
+      samp.new=ctds.bbsim(sim.obj$xyt,sim.obj$var,delta.t=sim.obj$delta.t,aug.delta.t=path.aug.interval,rast=examplerast)
+      ## added 11/4/14
+      start.times=samp.new$transition.times[-length(samp.new$transition.times)]
+      end.times=samp.new$transition.times[-1]
+      wait.times=end.times-start.times
+      locs=samp.new$ec
+  }
 
-  #browser()
+  ##browser()
 
-  locs.idx <- cumsum(c(TRUE,diff(path.loc.idx)!=0))
-  ##first.idx=c(1,which(diff(path.loc.idx)!=0))
-  first.idx=which(diff(path.loc.idx)!=0)
-  start.times=taug[first.idx[-length(first.idx)]]
-  end.times=taug[first.idx[-1]]
-  wait.times=end.times-start.times
-  locs=path.loc.idx[first.idx[-length(first.idx)]]
+  ## locs.idx <- cumsum(c(TRUE,diff(path.loc.idx)!=0))
+  ## ##first.idx=c(1,which(diff(path.loc.idx)!=0))
+  ## first.idx=which(diff(path.loc.idx)!=0)
+  ## start.times=taug[first.idx[-length(first.idx)]]
+  ## end.times=taug[first.idx[-1]]
+  ## wait.times=end.times-start.times
+  ## locs=path.loc.idx[first.idx[-length(first.idx)]]
   
 
     
@@ -122,6 +140,7 @@ make.Phi.mat <- function(sim.obj,spline.list,stack.static,stack.grad,other.sim.l
   }else{
     X.static=matrix(values(stack.static)[start.cells],ncol=1)
   }
+  #colnames(X.static) <- layerNames(stack.static)
   colnames(X.static) <- names(stack.static)
   
   ##

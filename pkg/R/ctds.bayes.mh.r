@@ -54,6 +54,7 @@ ctds.bayes.mh <- function(sim.obj,spline.list,stack.static,stack.grad,conspecifi
     alpha.star=rmvnorm(1,alpha,sigma=alpha.tune.mat)
     intercept.star=rnorm(1,intercept,sqrt(intercept.tune))
 
+##    browser()
     mh1=loglik.pois(z,tau,Phi,alpha.star,intercept.star)+dmvnorm(alpha.star,alpha,alpha.prior.var,log=TRUE)
     mh2=loglik.pois(z,tau,Phi,alpha,intercept)+dmvnorm(alpha,alpha.star,alpha.prior.var,log=TRUE)
 

@@ -20,9 +20,12 @@ ctds.bayes.lasso <- function(sim.obj,spline.list,stack.static,stack.grad,conspec
   alpha[which(alpha==0)] <- .000001
   #alpha=Matrix(0,ncol=1,nrow=ncol(out$Phi))
 
+  
   intercept=intercept.start
 
   alpha.int=c(intercept,alpha)
+
+  alpha.tune.mat=diag(c(intercept.tune,diag(alpha.tune.mat)))
   
   lambda.2=(lambda.prior.r/lambda.prior.q)^2
   if(!is.na(lambda)){
@@ -40,8 +43,9 @@ ctds.bayes.lasso <- function(sim.obj,spline.list,stack.static,stack.grad,conspec
   
   for(iter in 1:n.mcmc){
 
-    cat(iter," ")
-
+      ## if((iter/1000)%%1==1){
+          cat(iter," ")
+      ## }
     #browser()
 
     
