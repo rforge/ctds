@@ -9,671 +9,309 @@ Telemetry data for two mountain lions in the Front range cougar study.
 An adult female, AF79, and her subadult cub, AM80.
 }
 \usage{data(lion.pair)}
+\examples{
+attach(lion.pair)
+lion1$ID
+lion2$ID
+
+
+##
+## Running CRAWL on the lions
+##
+
+## subsetting time
+
+startmintime=mintime
+
+mintime=4103.085
+maxtime=mintime+21
+
+time.idx.1=which(lion1$locs.orig[,3] >= mintime & lion1$locs.orig[,3]<maxtime)
+time.idx.2=which(lion2$locs.orig[,3] >= mintime & lion2$locs.orig[,3]<maxtime)
+
+## Running crawl on lion1
+
+lion1$locs=lion1$locs.orig[time.idx.1,]
+ini.list <- list(a1.x=c(lion1$locs[1,1], 0),a1.y=c(lion1$locs[1,2], 0),P1.x=diag(c(1,1)),P1.y=diag(c(1,1)))
+crawl.fit=crwMLE(data=lion1$locs,coord=c("UTM_X","UTM_Y"),Time.name="datetime",drift.model=FALSE,err.model=list(x=~1, y=~1),initial.state=ini.list,control=list(maxit=2000,trace=1, REPORT=10),polar.coord=FALSE,fixPar=c(log(10/4), log(10/4), NA,NA),initialSANN=list(maxit=2500,trace=1, REPORT=10),need.hess=1)
+## pred times every 5 minute:
+pred.times <- seq(min(lion1$locs$datetime), max(lion1$locs$datetime), 1/24/10) 
+predObj <- crwPredict(object.crwFit=crawl.fit, pred.times, speedEst=TRUE, flat=FALSE,getUseAvail=TRUE)
+sim.obj <- crwSimulator(crawl.fit,pred.times,parIS=1000,df=20,scale=18/20)
+lion1$crawl.fit=crawl.fit
+lion1$pred.times=pred.times
+lion1$pred.obj=predObj
+lion1$sim.obj=sim.obj
+lion.pair$lion1 <- lion1
+
+## Running crawl on lion2
+
+lion2$locs=lion2$locs.orig[time.idx.2,]
+ini.list <- list(a1.x=c(lion2$locs[1,1], 0),a1.y=c(lion2$locs[1,2], 0),P1.x=diag(c(1,1)),P1.y=diag(c(1,1)))
+crawl.fit=crwMLE(data=lion2$locs,coord=c("UTM_X","UTM_Y"),Time.name="datetime",drift.model=FALSE,err.model=list(x=~1, y=~1),initial.state=ini.list,control=list(maxit=2000,trace=1, REPORT=10),polar.coord=FALSE,fixPar=c(log(10/4), log(10/4), NA,NA),initialSANN=list(maxit=500,trace=1, REPORT=10),need.hess=1)
+## pred times every 5 minute:
+pred.times <- seq(min(lion2$locs$datetime), max(lion2$locs$datetime), 1/24/10) 
+predObj <- crwPredict(object.crwFit=crawl.fit, pred.times, speedEst=TRUE, flat=FALSE,getUseAvail=TRUE)
+## Create crawl simulator object
+## Note: this can take a LONG time
+sim.obj <- crwSimulator(crawl.fit,pred.times,parIS=1000,df=20,scale=18/20)
+lion2$crawl.fit=crawl.fit
+lion2$pred.times=pred.times
+lion2$pred.obj=predObj
+lion2$sim.obj=sim.obj
+lion.pair$lion2 <- lion2
+
+
+##
+## Plot animals over time
+##
+simlist=list(lion1$sim.obj,lion2$sim.obj)
+movie.times=seq(mintime,maxtime,length.out=50)
+
+## backdrop raster for plot
+backdrop=stack.cropped[[7]]
+#plot.ani.interact(simlist,backdrop,movie.times,legend=F,col.list=c("red","blue"),pdfname="MF.pdf")
+
+
+
+##
+##
+## Data Analysis
+##
+##
+
+AF79=lion1
+AM80=lion2
+
+
+time.idx.1=which(AF79$locs[,3] >= mintime-2 & AF79$locs[,3]<maxtime+2)
+time.idx.2=which(AM80$locs[,3] >= mintime-2 & AM80$locs[,3]<maxtime+2)
+
+mintime=max(mintime,min(AF79$locs[,3]),min(AM80$locs[,3]))
+maxtime=min(maxtime,max(AF79$locs[,3]),max(AM80$locs[,3]))
+
+#plot(stack.cropped)
+#round(cor(values(stack.cropped),na.rm=T),2)
+
+##
+##
+## Get Rasters for static covariates
+##
+##
+
+intercept=stack.cropped[[1]]
+values(intercept) <- 1
+
+NotForest=stack.cropped[[1]]+stack.cropped[[2]]+stack.cropped[[3]]+stack.cropped[[4]]+stack.cropped[[6]]
+
+static.cover=stack(intercept,NotForest)
+names(static.cover) <- c("Intercept","NotForest")
+
+##
+##
+## Get Rasters for dynamic covariates
+##
+##
+
+
+cl=FindCenters(AM80,mintime=mintime,maxtime=maxtime,max.dist=200,max.time.dist=27,nightonly=T)
+#cl=FindCenters(AF79,mintime=mintime,maxtime=maxtime,max.dist=200,max.time.dist=27,nightonly=T)
+cl
+kill.sites.rast=intercept
+values(kill.sites.rast) <- NA
+cent.cells=cellFromXY(kill.sites.rast,cl$clusters)
+values(kill.sites.rast)[cent.cells] <- 0
+d2kill=distance(kill.sites.rast)
+plot(d2kill)
+
+dynamic.stack=stack(d2kill,stack.cropped[[7]])
+names(dynamic.stack) <- c("Dist2Kill","Elevation")
+
+
+##
+##
+## Making spline knots for time-homogeneous model
+##
+##
+
+knot.intervals.static=c(0)
+knot.intervals.grad=c(0)
+knot.intervals.ani=0
+knot.intervals.crw=0
+knot.intervals=list(static=knot.intervals.static,grad=knot.intervals.grad,ani=knot.intervals.ani,crw=knot.intervals.crw)
+
+knot.intervals
+
+spl.list=make.spline.list(mintime,maxtime,knot.intervals)
+
+## pick time intervals to linearly interpolate between crawl times
+t.interval=1/24/60/60
+
+
+
+
+##
+## MI approach (10 paths)
+##
+
+ctds.AM80=ctds.MI.prep(AM80$sim.obj,spl.list,NotForest,d2kill,conspecifics.list=list(AF79$sim.obj),num.crawl.paths=10,crw=TRUE,path.aug.interval=t.interval)
+
+glm.out.AM80=ctds.glm.MI(ctds.AM80,method="MI",plot.cv=FALSE)
+
+## getting betas
+times.betas=0
+
+beta.mat.AM80=get.betas(glm.out.AM80,spl.list,times.betas)
+sd.mat.AM80=get.betas.sd(glm.out.AM80,spl.list,times.betas)
+
+beta.mat.AM80
+sd.mat.AM80
+
+
+
+##
+## Bayes with mh step
+##
+
+tune=.1
+sd=sd.mat.AM80[1,]
+sd[1] <- glm.out.AM80$intercept.sd
+
+Phi=ctds.AM80$Phi[[1]]
+tune.mat=as.matrix(solve(t(Phi)%*%Phi))
+
+alpha.tune=tune*tune.mat
+intercept.tune=.01
+
+alpha.start=beta.mat.AM80[1,]
+intercept.start <- glm.out.AM80$intercept
+
+ctds.AM80.bayes=ctds.bayes.mh(AM80$sim.obj,spl.list,NotForest,d2kill,conspecifics.list=list(AF79$sim.obj),crw=TRUE,path.aug.interval=t.interval,alpha.start=alpha.start,intercept.start=intercept.start,intercept.tune=intercept.tune,alpha.tune.mat=alpha.tune,n.mcmc=20)
+
+matplot(ctds.AM80.bayes$alpha.save,type="l")
+ctds.AM80.bayes$accept
+
+alphas.glm=glm.out.AM80$alpha
+sd.glm=c(glm.out.AM80$alpha.sd)
+
+
+
+beta.names.AM80 <- c("(a)  Static Cover - Not Forest","(b) Dynamic Covariate - Direction to Nearest Potential Kill Site","(c) Dynamic Covariate - Direction to AF79","(d) CRW Autoregressive Parameter")
+
+#pdf("HistBayesMI.pdf",width=8,height=5)
+par(mfrow=c(2,2))
+for(i in 1:4){
+  hist(ctds.AM80.bayes$alpha.save[,i],col=i)
+  abline(v=alphas.glm[i],lwd=5)
+  abline(v=alphas.glm[i]+1.96*sd.glm[i],lty=2,lwd=3)
+  abline(v=alphas.glm[i]-1.96*sd.glm[i],lty=2,lwd=3)
+}
+#dev.off()
+
+
+
+
+
+##
+## Time-Varying Coefficient Analysis (with Lasso)
+##
+
+
+##
+##
+## Making spline knots for varying-coefficient model
+##
+##
+
+knot.intervals.static=c(1/4)
+knot.intervals.grad=c(1/4)
+knot.intervals.ani=1/4
+knot.intervals.crw=1/4
+knot.intervals=list(static=knot.intervals.static,grad=knot.intervals.grad,ani=knot.intervals.ani,crw=knot.intervals.crw)
+
+knot.intervals
+
+spl.list=make.spline.list(0,1,knot.intervals,spl.option.idx=20)
+
+## pick time intervals to linearly interpolate between crawl times
+t.interval=1/24/60/60
+
+
+
+
+##
+## MI with stacked lasso
+##
+
+
+ctds.AM80=ctds.MI.prep(AM80$sim.obj,spl.list,NotForest,d2kill,conspecifics.list=list(AF79$sim.obj),num.crawl.paths=10,crw=TRUE,path.aug.interval=t.interval,spline.period=1)
+
+glm.out.AM80=ctds.glm.MI(ctds.AM80,method="MI",plot.cv=FALSE)
+glm.out.AM80.lasso=ctds.glm.MI(ctds.AM80,method="Stacked.cv",plot.cv=TRUE)
+
+
+## Plotting betas
+times.betas=seq(0,1,1/24/6)
+beta.mat.AM80=get.betas(glm.out.AM80.lasso,spl.list,times.betas)
+matplot(beta.mat.AM80,ylim=c(-1,1),type="l")
+
+
+##
+## Fully Bayesian version with Time-Varying Coefficient Model and Lasso Penalty
+##
+
+## Prep for Bayesian version
+alpha.start=glm.out.AM80.lasso$alpha
+alpha.tune=diag(glm.out.AM80$alpha.sd^2)
+intercept.start=glm.out.AM80.lasso$intercept
+intercept.var=glm.out.AM80$intercept.sd^2
+
+lambda.cv=glm.out.AM80.lasso$lambda.best
+
+tune=.05
+
+## MCMC
+
+library(statmod)
+ctds.AM80.bayes.lasso=ctds.bayes.lasso(AM80$sim.obj,spl.list,NotForest,d2kill,conspecifics.list=list(AF79$sim.obj),crw=TRUE,path.aug.interval=t.interval,intercept.start=intercept.start,intercept.tune=tune*intercept.var,alpha.start=alpha.start,alpha.tune.mat=tune*alpha.tune,lambda=lambda.cv,spline.period=1,n.mcmc=20)
+
+matplot(ctds.AM80.bayes.lasso$alpha.save,type="l")
+ctds.AM80.bayes.lasso$accept
+
+
+## source("plot.betas.r")
+plot.betas(ctds.AM80.bayes.lasso,spl.list,times.betas)
+plot.betas(glm.out.AM80,spl.list,times.betas)
+## getting betas
+
+betas.lasso <- get.betas(ctds.AM80.bayes.lasso,spl.list,times.betas)
+betas.sd.lasso <- get.betas.sd(ctds.AM80.bayes.lasso,spl.list,times.betas)
+
+
+beta.names.AM80 <- c("(a) Static Cover - Not Forest","(b) Dynamic Covariate - Direction to Nearest Potential Kill Site","(c) Dynamic Covariate - Direction to AF79","(d) CRW Autoregressive Parameter")
+beta.names.AM80 <- c("(a) Cover - Not Forest","(b) Direction to Nearest PKS","(c) Direction to Conspecific","(d) CRW Autoregressive Parameter")
+
+
+
+##pdf("LassoResults.pdf",width=8,height=7)
+par(mfrow=c(2,2))
+for(i in 1:4){
+  max.val=max(betas.lasso[,i]+1.6*betas.sd.lasso[,i])
+  min.val=min(betas.lasso[,i]-1.6*betas.sd.lasso[,i])
+  plot(times.betas*24,betas.lasso[,i],col="black",type="l",lwd=3,main=beta.names.AM80[i],ylim=c(min.val,max.val),xlab="Hour of the Day",ylab=expression(beta))
+  abline(h=0)
+  points(times.betas*24,betas.lasso[,i]+1.96*betas.sd.lasso[,i],col="black",type="l",lty=3,lwd=2)
+  points(times.betas*24,betas.lasso[,i]-1.96*betas.sd.lasso[,i],col="black",type="l",lty=3,lwd=2)
+  points(times.betas*24,beta.mat.AM80[,i],col="black",type="l",lty=2,lwd=2)
+  if(i==1){
+      legend("bottomright",legend=c("Lasso Estimate","Bayesian Posterior Mean","Bayesian Posterior CI"),lty=c(2,1,3),lwd=2)
+  }
+}
+##dev.off()
+}
+
 \format{
-  The format is:
-List of 6
- $ lion1        :List of 7
-  ..$ ID        : Factor w/ 57 levels "AF01","AF03",..: 31
-  ..$ Sex       : Factor w/ 2 levels "Female","Male": 1
-  ..$ locs.orig :'data.frame':	540 obs. of  3 variables:
-  .. ..$ UTM_X   : num [1:540] 458189 458212 457834 457840 458567 ...
-  .. ..$ UTM_Y   : num [1:540] 4384107 4384188 4384561 4384554 4384293 ...
-  .. ..$ datetime: num [1:540] 4095 4095 4095 4096 4096 ...
-  ..$ locs      :'data.frame':	98 obs. of  3 variables:
-  .. ..$ UTM_X   : num [1:98] 458189 458212 457834 457840 458567 ...
-  .. ..$ UTM_Y   : num [1:98] 4384107 4384188 4384561 4384554 4384293 ...
-  .. ..$ datetime: num [1:98] 4095 4095 4095 4096 4096 ...
-  ..$ crawl.fit :List of 34
-  .. ..$ par          : num [1:4] 0.916 0.916 7.482 15.126
-  .. ..$ estPar       : num [1:2] 7.48 15.13
-  .. ..$ se           : num [1:4] NA NA 0.0508 297.3302
-  .. ..$ ci           : num [1:4, 1:2] NA NA 7.38 -567.64 NA ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr [1:2] "L" "U"
-  .. ..$ Cmat         : num [1:4, 1:4] NA NA NA NA NA NA NA NA NA NA ...
-  .. ..$ loglik       : num -1386
-  .. ..$ aic          : num 2777
-  .. ..$ initial.state:List of 4
-  .. .. ..$ a1.x: num [1:2] 458189 0
-  .. .. ..$ a1.y: num [1:2] 4384107 0
-  .. .. ..$ P1.x: num [1:2, 1:2] 1 0 0 1
-  .. .. ..$ P1.y: num [1:2, 1:2] 1 0 0 1
-  .. ..$ coord        : chr [1:2] "UTM_X" "UTM_Y"
-  .. ..$ fixPar       : num [1:4] 0.916 0.916 NA NA
-  .. ..$ convergence  : int 0
-  .. ..$ message      : chr "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
-  .. ..$ stop.model   : NULL
-  .. ..$ random.drift : logi FALSE
-  .. ..$ mov.model    :Class 'formula' length 2 ~1
-  .. .. .. ..- attr(*, ".Environment")=<environment: 0xaef3960> 
-  .. ..$ err.model    :List of 2
-  .. .. ..$ x:Class 'formula' length 2 ~1
-  .. .. .. .. ..- attr(*, ".Environment")=<environment: R_GlobalEnv> 
-  .. .. ..$ y:Class 'formula' length 2 ~1
-  .. .. .. .. ..- attr(*, ".Environment")=<environment: R_GlobalEnv> 
-  .. ..$ n.par        : int 4
-  .. ..$ nms          : chr [1:4] "ln tau.x (Intercept)" "ln tau.y (Intercept)" "ln sigma (Intercept)" "ln beta (Intercept)"
-  .. ..$ n.mov        : int 1
-  .. ..$ n.errX       : int 1
-  .. ..$ n.errY       : int 1
-  .. ..$ mov.mf       : num [1:98, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. .. ..- attr(*, "assign")= int 0
-  .. ..$ err.mfX      : num [1:98, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. ..$ err.mfY      : num [1:98, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. ..$ stop.mf      : NULL
-  .. ..$ polar.coord  : logi FALSE
-  .. ..$ Time.name    : chr "datetime"
-  .. ..$ init         :List of 5
-  .. .. ..$ par        : num [1:2] 7.64 3.44
-  .. .. ..$ value      : num 2778
-  .. .. ..$ counts     : Named int [1:2] 50 NA
-  .. .. .. ..- attr(*, "names")= chr [1:2] "function" "gradient"
-  .. .. ..$ convergence: int 0
-  .. .. ..$ message    : NULL
-  .. ..$ data         :'data.frame':	98 obs. of  3 variables:
-  .. .. ..$ UTM_X   : num [1:98] 458189 458212 457834 457840 458567 ...
-  .. .. ..$ UTM_Y   : num [1:98] 4384107 4384188 4384561 4384554 4384293 ...
-  .. .. ..$ datetime: num [1:98] 4095 4095 4095 4096 4096 ...
-  .. ..$ lower        : num [1:2] -Inf -Inf
-  .. ..$ upper        : num [1:2] Inf Inf
-  .. ..$ prior        : NULL
-  .. ..$ need.hess    : num 1
-  .. ..$ runTime      :Class 'difftime'  atomic [1:1] 0.754
-  .. .. .. ..- attr(*, "units")= chr "secs"
-  .. ..- attr(*, "class")= chr "crwFit"
-  ..$ pred.times: num [1:1015] 4095 4095 4095 4095 4095 ...
-  ..$ pred.obj  :List of 9
-  .. ..$ originalData:'data.frame':	1112 obs. of  4 variables:
-  .. .. ..$ datetime: num [1:1112] 4095 4095 4095 4095 4095 ...
-  .. .. ..$ locType : chr [1:1112] "p" "p" "p" "p" ...
-  .. .. ..$ UTM_X   : num [1:1112] 458189 NA NA NA NA ...
-  .. .. ..$ UTM_Y   : num [1:1112] 4384107 NA NA NA NA ...
-  .. ..$ alpha.hat.y :'data.frame':	1112 obs. of  2 variables:
-  .. .. ..$ mu.y: num [1:1112] 4384107 4384120 4384134 4384147 4384161 ...
-  .. .. ..$ nu.y: num [1:1112] 5.58e-11 6.53e+02 6.53e+02 6.53e+02 6.53e+02 ...
-  .. ..$ alpha.hat.x :'data.frame':	1112 obs. of  2 variables:
-  .. .. ..$ mu.x: num [1:1112] 458189 458193 458197 458201 458204 ...
-  .. .. ..$ nu.x: num [1:1112] 1.54e-11 1.80e+02 1.80e+02 1.80e+02 1.80e+02 ...
-  .. ..$ V.hat.y     : num [1:2, 1:2, 1:1112] 1 0 0 1 54734 ...
-  .. ..$ V.hat.x     : num [1:2, 1:2, 1:1112] 1 0 0 1 54734 ...
-  .. ..$ speed       :'data.frame':	1112 obs. of  2 variables:
-  .. .. ..$ ln.speed    : num [1:1112] -23.57 6.52 6.52 6.52 6.52 ...
-  .. .. ..$ var.ln.speed: num [1:1112] 2.98e+20 1.28e+07 1.28e+07 1.28e+07 1.28e+07 ...
-  .. ..$ loglik      : num -1386
-  .. ..$ useAvail    :List of 2
-  .. .. ..$ use  : num [1:1014, 1:5] 4095 4095 4095 4095 4095 ...
-  .. .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. .. ..$ : NULL
-  .. .. .. .. ..$ : chr [1:5] "datetime" "meanUse.x" "meanUse.y" "varUse.x" ...
-  .. .. ..$ avail: num [1:1014, 1:5] 4095 4095 4095 4095 4095 ...
-  .. .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. .. ..$ : NULL
-  .. .. .. .. ..$ : chr [1:5] "datetime" "meanAvail.x" "meanAvail.y" "varAvail.x" ...
-  .. ..$ fit.test    :'data.frame':	1112 obs. of  8 variables:
-  .. .. ..$ shock.x      : num [1:1112] -5.7e-05 NA NA NA NA ...
-  .. .. ..$ predObs.x    : num [1:1112] 458189 NA NA NA NA ...
-  .. .. ..$ Vshock.x     : num [1:1112] 7.25 NA NA NA NA ...
-  .. .. ..$ shock.y      : num [1:1112] -0.000207 NA NA NA NA ...
-  .. .. ..$ predObs.y    : num [1:1112] 4384107 NA NA NA NA ...
-  .. .. ..$ Vshock.y     : num [1:1112] 7.25 NA NA NA NA ...
-  .. .. ..$ outlier.chisq: num [1:1112] 6.36e-09 NaN NaN NaN NaN ...
-  .. .. ..$ naive.p.val  : num [1:1112] 1 NaN NaN NaN NaN ...
-  .. ..- attr(*, "flat")= logi FALSE
-  .. ..- attr(*, "coord")= Named chr [1:2] "UTM_X" "UTM_Y"
-  .. .. ..- attr(*, "names")= chr [1:2] "x" "y"
-  .. ..- attr(*, "random.drift")= logi FALSE
-  .. ..- attr(*, "polar.coord")= logi FALSE
-  .. ..- attr(*, "Time.name")= chr "datetime"
-  .. ..- attr(*, "class")= chr [1:2] "list" "crwPredict"
- $ lion2        :List of 8
-  ..$ ID        : Factor w/ 57 levels "AF01","AF03",..: 54
-  ..$ Sex       : Factor w/ 2 levels "Female","Male": 2
-  ..$ locs.orig :'data.frame':	885 obs. of  3 variables:
-  .. ..$ UTM_X   : num [1:885] 458318 458613 458024 458024 458023 ...
-  .. ..$ UTM_Y   : num [1:885] 4384122 4384338 4384590 4384604 4384593 ...
-  .. ..$ datetime: num [1:885] 4095 4095 4095 4096 4096 ...
-  ..$ locs      :'data.frame':	140 obs. of  3 variables:
-  .. ..$ UTM_X   : num [1:140] 458318 458613 458024 458024 458023 ...
-  .. ..$ UTM_Y   : num [1:140] 4384122 4384338 4384590 4384604 4384593 ...
-  .. ..$ datetime: num [1:140] 4095 4095 4095 4096 4096 ...
-  ..$ crawl.fit :List of 34
-  .. ..$ par          : num [1:4] 0.916 0.916 7.026 3.81
-  .. ..$ estPar       : num [1:2] 7.03 3.81
-  .. ..$ se           : num [1:4] NA NA 0.0659 0.499
-  .. ..$ ci           : num [1:4, 1:2] NA NA 6.9 2.83 NA ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr [1:2] "L" "U"
-  .. ..$ Cmat         : num [1:4, 1:4] NA NA NA NA NA NA NA NA NA NA ...
-  .. ..$ loglik       : num -1803
-  .. ..$ aic          : num 3610
-  .. ..$ initial.state:List of 4
-  .. .. ..$ a1.x: num [1:2] 458318 0
-  .. .. ..$ a1.y: num [1:2] 4384122 0
-  .. .. ..$ P1.x: num [1:2, 1:2] 1 0 0 1
-  .. .. ..$ P1.y: num [1:2, 1:2] 1 0 0 1
-  .. ..$ coord        : chr [1:2] "UTM_X" "UTM_Y"
-  .. ..$ fixPar       : num [1:4] 0.916 0.916 NA NA
-  .. ..$ convergence  : int 0
-  .. ..$ message      : chr "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
-  .. ..$ stop.model   : NULL
-  .. ..$ random.drift : logi FALSE
-  .. ..$ mov.model    :Class 'formula' length 2 ~1
-  .. .. .. ..- attr(*, ".Environment")=<environment: 0xbf57940> 
-  .. ..$ err.model    :List of 2
-  .. .. ..$ x:Class 'formula' length 2 ~1
-  .. .. .. .. ..- attr(*, ".Environment")=<environment: R_GlobalEnv> 
-  .. .. ..$ y:Class 'formula' length 2 ~1
-  .. .. .. .. ..- attr(*, ".Environment")=<environment: R_GlobalEnv> 
-  .. ..$ n.par        : int 4
-  .. ..$ nms          : chr [1:4] "ln tau.x (Intercept)" "ln tau.y (Intercept)" "ln sigma (Intercept)" "ln beta (Intercept)"
-  .. ..$ n.mov        : int 1
-  .. ..$ n.errX       : int 1
-  .. ..$ n.errY       : int 1
-  .. ..$ mov.mf       : num [1:140, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. .. ..- attr(*, "assign")= int 0
-  .. ..$ err.mfX      : num [1:140, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. ..$ err.mfY      : num [1:140, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. ..$ : NULL
-  .. .. .. ..$ : chr "(Intercept)"
-  .. ..$ stop.mf      : NULL
-  .. ..$ polar.coord  : logi FALSE
-  .. ..$ Time.name    : chr "datetime"
-  .. ..$ init         :List of 5
-  .. .. ..$ par        : num [1:2] 7 3.94
-  .. .. ..$ value      : num 3606
-  .. .. ..$ counts     : Named int [1:2] 200 NA
-  .. .. .. ..- attr(*, "names")= chr [1:2] "function" "gradient"
-  .. .. ..$ convergence: int 0
-  .. .. ..$ message    : NULL
-  .. ..$ data         :'data.frame':	140 obs. of  3 variables:
-  .. .. ..$ UTM_X   : num [1:140] 458318 458613 458024 458024 458023 ...
-  .. .. ..$ UTM_Y   : num [1:140] 4384122 4384338 4384590 4384604 4384593 ...
-  .. .. ..$ datetime: num [1:140] 4095 4095 4095 4096 4096 ...
-  .. ..$ lower        : num [1:2] -Inf -Inf
-  .. ..$ upper        : num [1:2] Inf Inf
-  .. ..$ prior        : NULL
-  .. ..$ need.hess    : num 1
-  .. ..$ runTime      :Class 'difftime'  atomic [1:1] 0.855
-  .. .. .. ..- attr(*, "units")= chr "secs"
-  .. ..- attr(*, "class")= chr "crwFit"
-  ..$ pred.times: num [1:1015] 4095 4095 4095 4095 4095 ...
-  ..$ pred.obj  :List of 9
-  .. ..$ originalData:'data.frame':	1154 obs. of  4 variables:
-  .. .. ..$ datetime: num [1:1154] 4095 4095 4095 4095 4095 ...
-  .. .. ..$ locType : chr [1:1154] "p" "p" "p" "p" ...
-  .. .. ..$ UTM_X   : num [1:1154] 458318 NA NA NA NA ...
-  .. .. ..$ UTM_Y   : num [1:1154] 4384122 NA NA NA NA ...
-  .. ..$ alpha.hat.y :'data.frame':	1154 obs. of  2 variables:
-  .. .. ..$ mu.y: num [1:1154] 4384122 4384137 4384170 4384208 4384250 ...
-  .. .. ..$ nu.y: num [1:1154] 3.61e-05 1.26e+03 1.75e+03 1.95e+03 2.03e+03 ...
-  .. ..$ alpha.hat.x :'data.frame':	1154 obs. of  2 variables:
-  .. .. ..$ mu.x: num [1:1154] 458318 458346 458406 458476 458544 ...
-  .. .. ..$ nu.x: num [1:1154] 6.79e-05 2.35e+03 3.21e+03 3.40e+03 3.09e+03 ...
-  .. ..$ V.hat.y     : num [1:2, 1:2, 1:1154] 1 0 0 1 3341 ...
-  .. ..$ V.hat.x     : num [1:2, 1:2, 1:1154] 1 0 0 1 3341 ...
-  .. ..$ speed       :'data.frame':	1154 obs. of  2 variables:
-  .. .. ..$ ln.speed    : num [1:1154] -9.47 7.89 8.21 8.27 8.21 ...
-  .. .. ..$ var.ln.speed: num [1:1154] 1.69e+08 2.69 1.36 1.11 1.28 ...
-  .. ..$ loglik      : num -1803
-  .. ..$ useAvail    :List of 2
-  .. .. ..$ use  : num [1:1014, 1:5] 4095 4095 4095 4095 4095 ...
-  .. .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. .. ..$ : NULL
-  .. .. .. .. ..$ : chr [1:5] "datetime" "meanUse.x" "meanUse.y" "varUse.x" ...
-  .. .. ..$ avail: num [1:1014, 1:5] 4095 4095 4095 4095 4095 ...
-  .. .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. .. ..$ : NULL
-  .. .. .. .. ..$ : chr [1:5] "datetime" "meanAvail.x" "meanAvail.y" "varAvail.x" ...
-  .. ..$ fit.test    :'data.frame':	1154 obs. of  8 variables:
-  .. .. ..$ shock.x      : num [1:1154] -0.00309 NA NA NA NA ...
-  .. .. ..$ predObs.x    : num [1:1154] 458318 NA NA NA NA ...
-  .. .. ..$ Vshock.x     : num [1:1154] 7.25 NA NA NA NA ...
-  .. .. ..$ shock.y      : num [1:1154] -0.00163 NA NA NA NA ...
-  .. .. ..$ predObs.y    : num [1:1154] 4384122 NA NA NA NA ...
-  .. .. ..$ Vshock.y     : num [1:1154] 7.25 NA NA NA NA ...
-  .. .. ..$ outlier.chisq: num [1:1154] 1.69e-06 NaN NaN NaN NaN ...
-  .. .. ..$ naive.p.val  : num [1:1154] 1 NaN NaN NaN NaN ...
-  .. ..- attr(*, "flat")= logi FALSE
-  .. ..- attr(*, "coord")= Named chr [1:2] "UTM_X" "UTM_Y"
-  .. .. ..- attr(*, "names")= chr [1:2] "x" "y"
-  .. ..- attr(*, "random.drift")= logi FALSE
-  .. ..- attr(*, "polar.coord")= logi FALSE
-  .. ..- attr(*, "Time.name")= chr "datetime"
-  .. ..- attr(*, "class")= chr [1:2] "list" "crwPredict"
-  ..$ sim.obj   :List of 32
-  .. ..$ x            : num [1:1154] 458318 9999 9999 9999 9999 ...
-  .. ..$ y            : num [1:1154] 4384122 9999 9999 9999 9999 ...
-  .. ..$ loctype      : num [1:1154] 0 1 1 1 1 1 1 0 1 1 ...
-  .. ..$ P1.y         : num [1:2, 1:2] 1 0 0 1
-  .. ..$ P1.x         : num [1:2, 1:2] 1 0 0 1
-  .. ..$ a1.x         : num [1:2] 458318 0
-  .. ..$ a1.y         : num [1:2] 4384122 0
-  .. ..$ n.errX       : int 1
-  .. ..$ n.errY       : int 1
-  .. ..$ n.mov        : int 1
-  .. ..$ delta        : num [1:1154] 0.0208 0.0208 0.0208 0.0208 0.0208 ...
-  .. ..$ lonAdj       : num [1:1154] 1 1 1 1 1 1 1 1 1 1 ...
-  .. ..$ driftMod     : logi FALSE
-  .. ..$ stopMod      : logi FALSE
-  .. ..$ stop.mf      : NULL
-  .. ..$ err.mfX      : num [1:1154, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. ..$ err.mfY      : num [1:1154, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. ..$ mov.mf       : num [1:1154, 1] 1 1 1 1 1 1 1 1 1 1 ...
-  .. ..$ fixPar       : num [1:4] 0.916 0.916 NA NA
-  .. ..$ Cmat         : num [1:4, 1:4] NA NA NA NA NA NA NA NA NA NA ...
-  .. ..$ predType     : chr [1:1154] "p" "p" "p" "p" ...
-  .. ..$ par          : num [1:4] 0.916 0.916 7.026 3.81
-  .. ..$ nms          : chr [1:4] "ln tau.x (Intercept)" "ln tau.y (Intercept)" "ln sigma (Intercept)" "ln beta (Intercept)"
-  .. ..$ N            : int 1154
-  .. ..$ lower        : num [1:2] -Inf -Inf
-  .. ..$ upper        : num [1:2] Inf Inf
-  .. ..$ loglik       : num -1803
-  .. ..$ datetime     : num [1:1154] 4095 4095 4095 4095 4095 ...
-  .. ..$ coord        : chr [1:2] "UTM_X" "UTM_Y"
-  .. ..$ Time.name    : chr "datetime"
-  .. ..$ prior        : NULL
-  .. ..$ thetaSampList:List of 1
-  .. .. ..$ : num [1:1000, 1:7] 0.000944 0.000866 0.000776 0.000938 0.000912 ...
-  .. .. .. ..- attr(*, "dimnames")=List of 2
-  .. .. .. .. ..$ : NULL
-  .. .. .. .. ..$ : chr [1:7] "w" "lik" "prop.lik" "ln tau.x (Intercept)" ...
-  .. .. .. ..- attr(*, "effSamp")= num 137
-  .. .. .. ..- attr(*, "method")= chr "IS"
-  .. .. .. ..- attr(*, "numLikEval")= num 1000
-  .. ..- attr(*, "class")= chr "crwSimulator"
- $ mintime      : num 4096
- $ maxtime      : num 4114
- $ extent       :Formal class 'Extent' [package "raster"] with 4 slots
-  .. ..@ xmin: num 398400
-  .. ..@ xmax: num 469197
-  .. ..@ ymin: num 4355586
-  .. ..@ ymax: num 4438958
- $ stack.cropped:Formal class 'RasterStack' [package "raster"] with 11 slots
-  .. ..@ filename  : chr ""
-  .. ..@ layers    :List of 7
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 0 0 0 0 0 0 0 0 0 0 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi FALSE
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "city"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 0 0 0 0 0 0 0 0 0 0 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi NA
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "ag"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 0 0 0 0 0 0 0 0 0 0 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi NA
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "grass"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 0 0 0 0 0 0 0 0 0 0 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi NA
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "shrub"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 1 1 1 1 1 1 1 1 1 1 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi NA
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "forest"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 0 0 0 0 0 0 0 0 0 0 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi NA
-  .. .. .. .. .. .. ..@ attributes:List of 1
-  .. .. .. .. .. .. .. ..$ : NULL
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 0
-  .. .. .. .. .. .. ..@ max       : num 1
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "bare"
-  .. .. .. .. ..@ z         : list()
-  .. .. ..$ :Formal class 'RasterLayer' [package "raster"] with 13 slots
-  .. .. .. .. ..@ file      :Formal class '.RasterFile' [package "raster"] with 11 slots
-  .. .. .. .. .. .. ..@ name        : chr ""
-  .. .. .. .. .. .. ..@ datanotation: chr "FLT4S"
-  .. .. .. .. .. .. ..@ byteorder   : chr "little"
-  .. .. .. .. .. .. ..@ nodatavalue : num -Inf
-  .. .. .. .. .. .. ..@ nbands      : int 1
-  .. .. .. .. .. .. ..@ bandorder   : chr "BIL"
-  .. .. .. .. .. .. ..@ offset      : int 0
-  .. .. .. .. .. .. ..@ toptobottom : logi TRUE
-  .. .. .. .. .. .. ..@ blockrows   : int 0
-  .. .. .. .. .. .. ..@ blockcols   : int 0
-  .. .. .. .. .. .. ..@ driver      : chr ""
-  .. .. .. .. ..@ data      :Formal class '.SingleLayerData' [package "raster"] with 12 slots
-  .. .. .. .. .. .. ..@ values    : num [1:15260] 2997 2976 2958 2929 2901 ...
-  .. .. .. .. .. .. ..@ offset    : num 0
-  .. .. .. .. .. .. ..@ gain      : num 1
-  .. .. .. .. .. .. ..@ inmemory  : logi TRUE
-  .. .. .. .. .. .. ..@ fromdisk  : logi FALSE
-  .. .. .. .. .. .. ..@ isfactor  : logi FALSE
-  .. .. .. .. .. .. ..@ attributes: list()
-  .. .. .. .. .. .. ..@ haveminmax: logi TRUE
-  .. .. .. .. .. .. ..@ min       : num 2263
-  .. .. .. .. .. .. ..@ max       : num 3597
-  .. .. .. .. .. .. ..@ band      : int 1
-  .. .. .. .. .. .. ..@ unit      : chr ""
-  .. .. .. .. ..@ legend    :Formal class '.RasterLegend' [package "raster"] with 5 slots
-  .. .. .. .. .. .. ..@ type      : chr(0) 
-  .. .. .. .. .. .. ..@ values    : logi(0) 
-  .. .. .. .. .. .. ..@ color     : logi(0) 
-  .. .. .. .. .. .. ..@ names     : logi(0) 
-  .. .. .. .. .. .. ..@ colortable: logi(0) 
-  .. .. .. .. ..@ history   : list()
-  .. .. .. .. ..@ title     : chr(0) 
-  .. .. .. .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. .. .. .. ..@ xmin: num 451524
-  .. .. .. .. .. .. ..@ xmax: num 465524
-  .. .. .. .. .. .. ..@ ymin: num 4378808
-  .. .. .. .. .. .. ..@ ymax: num 4389708
-  .. .. .. .. ..@ rotated   : logi FALSE
-  .. .. .. .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. .. .. .. ..@ geotrans: num(0) 
-  .. .. .. .. .. .. ..@ transfun:function ()  
-  .. .. .. .. ..@ ncols     : int 140
-  .. .. .. .. ..@ nrows     : int 109
-  .. .. .. .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. .. .. .. ..@ projargs: chr " +proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. .. .. .. ..@ layernames: chr "r_1"
-  .. .. .. .. ..@ z         : list()
-  .. ..@ title     : chr(0) 
-  .. ..@ extent    :Formal class 'Extent' [package "raster"] with 4 slots
-  .. .. .. ..@ xmin: num 451524
-  .. .. .. ..@ xmax: num 465524
-  .. .. .. ..@ ymin: num 4378808
-  .. .. .. ..@ ymax: num 4389708
-  .. ..@ rotated   : logi FALSE
-  .. ..@ rotation  :Formal class '.Rotation' [package "raster"] with 2 slots
-  .. .. .. ..@ geotrans: num(0) 
-  .. .. .. ..@ transfun:function ()  
-  .. ..@ ncols     : int 140
-  .. ..@ nrows     : int 109
-  .. ..@ crs       :Formal class 'CRS' [package "sp"] with 1 slots
-  .. .. .. ..@ projargs: chr "+proj=utm +zone=13 +datum=NAD27 +units=m +no_defs +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat"
-  .. ..@ layernames: chr [1:7] "city" "ag" "grass" "shrub" ...
-  .. ..@ z         : list()
+
 }
 \details{
 %%  ~~ If necessary, more details than the __description__ above ~~
@@ -683,9 +321,5 @@ List of 6
 }
 \references{
 %%  ~~ possibly secondary sources and usages ~~
-}
-\examples{
-data(lion.pair)
-## maybe str(lion.pair) ; plot(lion.pair) ...
 }
 \keyword{datasets}
