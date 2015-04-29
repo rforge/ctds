@@ -10,7 +10,7 @@ semi-parametric regression.  Different knot intervals are allowed for
 different variables.
 }
 \usage{
-make.spline.list(mintime, maxtime, knot.intervals.list)
+make.spline.list(mintime, maxtime, knot.intervals.list, spl.option.idx=NA,...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -24,6 +24,9 @@ Numeric upper bound for time
 Either a vector of intervals at which spline knots should be placed, or
 a list of vectors of intervals.
 }
+  \item{spl.option.idx}{
+    legacy
+    }
 }
 \details{
 %%  ~~ If necessary, more details than the description above ~~

@@ -10,7 +10,7 @@ corresponding CTDS path, and computes the data matrices for the Poisson
 GLM latent variable approach.
 }
 \usage{
-make.Phi.mat(sim.obj, spline.list, stack.static, stack.grad, other.sim.list = list(), crw = TRUE, normalize.gradients = TRUE, grad.point.decreasing = TRUE, path.aug.interval = 0, spline.period = 0)
+make.Phi.mat(sim.obj, spline.list, stack.static, stack.grad, other.sim.list = list(), crw = TRUE, normalize.gradients = TRUE, grad.point.decreasing = TRUE, path.aug.interval = 0, spline.period = 0,imputation.model="CRAWL")
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -43,6 +43,10 @@ make.Phi.mat(sim.obj, spline.list, stack.static, stack.grad, other.sim.list = li
 }
   \item{spline.period}{
 %%     ~~Describe \code{spline.period} here~~
+}
+  \item{imputation.model}{
+Either "CRAWL" for the CTCRW imputation model or "BB" for a brownian
+bridge imputation model.
 }
 }
 \details{

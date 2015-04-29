@@ -10,7 +10,9 @@ for animal movement from the CRAWL package, and transforms each CTCRW
 path into a CTDS path on a grid.
 }
 \usage{
-ctds.MI.prep(sim.obj, spline.list, stack.static, stack.grad, conspecifics.list = NULL, crw = TRUE, num.crawl.paths = 10, path.aug.interval = 0, spline.period = 0)
+ctds.MI.prep(sim.obj, spline.list, stack.static, stack.grad,
+conspecifics.list = NULL, crw = TRUE, num.crawl.paths = 10,
+path.aug.interval = 0, spline.period = 0, imputation.model="CRAWL")
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,6 +43,10 @@ should be subsampled
 }
   \item{spline.period}{
 Legacy.
+}
+  \item{imputation.model}{
+Either "CRAWL" for the CTCRW imputation model or "BB" for a brownian
+bridge imputation model.
 }
 }
 \details{

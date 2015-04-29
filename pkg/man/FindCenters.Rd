@@ -9,7 +9,7 @@ Find activity centers defined by telemetry locations that are close in
 time and space.
 }
 \usage{
-FindCenters(ani, max.dist = 200, max.time.dist = 6, mintime = min(ani$locs[, 3]), maxtime = max(ani$locs[, 3]))
+FindCenters(ani, max.dist = 200, max.time.dist = 6, mintime = min(ani$locs[, 3]), maxtime = max(ani$locs[, 3]),nightonly=FALSE,nightstart=21/24,nightend=6/24)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -28,6 +28,15 @@ lower bound on the time interval searched for activity centers.
 }
   \item{maxtime}{
 upper bound on the time interval searched for activity centers.
+}
+  \item{nightonly}{
+Logical.  If TRUE, only consider activity centers visited at night.
+}
+  \item{nightstart}{
+Time (in hours/24) when night starts.
+}
+  \item{nightend}{
+Time (in hours/24) when night ends.
 }
 }
 \details{

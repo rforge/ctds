@@ -75,8 +75,13 @@ ctds.bayes.lasso <- function(sim.obj,spline.list,stack.static,stack.grad,conspec
     ## Sample s2
     ##
 
-    s2=1/rinvgauss(P,sqrt(lambda.2/alpha^2),lambda.2)
-    
+    s2.tmp=rep(NA,P)
+    for(i in 1:P){
+      s2.tmp[i]=rinvgauss(1,sqrt(lambda.2/alpha[i]^2),lambda.2)
+    }
+    s2.tmp[which(s2.tmp==0)]<-.Machine$double.eps
+    s2=1/s2.tmp    
+
     alpha.prior.var=diag(c(10^3,as.numeric(s2)))
 
     ##

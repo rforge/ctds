@@ -10,6 +10,8 @@ An adult female, AF79, and her subadult cub, AM80.
 }
 \usage{data(lion.pair)}
 \examples{
+\dontrun{
+data(lion.pair)
 attach(lion.pair)
 lion1$ID
 lion2$ID
@@ -308,6 +310,7 @@ for(i in 1:4){
   }
 }
 ##dev.off()
+}
 }
 
 \format{

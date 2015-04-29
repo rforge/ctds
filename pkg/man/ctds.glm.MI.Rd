@@ -11,7 +11,7 @@ estimator by stacking the imputations with tuning parameter chosen through cross
 "MI" which uses standard multiple imputation with no shrinkage. 
 }
 \usage{
-ctds.glm.MI(ctds.obj, nfolds = 10, nlambda = 100, plot.cv = TRUE, method = "Stacked.cv", cv.param = "min", ...)
+ctds.glm.MI(ctds.obj, nfolds = 10, nlambda = 100, plot.cv = FALSE, method = "Stacked.cv", cv.param = "min", ...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{

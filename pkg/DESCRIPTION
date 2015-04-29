@@ -1,11 +1,11 @@
 Package: ctds
-Version: 0.5.2
-Date: 2014-11-18
+Version: 0.5.3
+Date: 2015-04-29
 Title: Continuous-Time Discrete-Space Movement Models
 Authors@R: c(person("Ephraim", "Hanks", role = c("aut", "cre"),email = "hanks@psu.edu"))
 Author: Ephraim M. Hanks
 Maintainer: Ephraim M. Hanks <hanks@psu.edu>
-Depends: R (>= 3.1.2), raster, crawl, fda, Matrix, glmnet, statmod, sde
-Description: Functions to fit continuous-time, discrete-space models to animal telemetry data. 
+Depends: R, raster, crawl, fda, Matrix, glmnet, statmod, sde, mvtnorm
+Description: Functions to fit continuous-time, discrete-space models to animal telemetry data.  Example code can be obtained by typing "help(lion.pair)" at the R prompt.
 License: GPL (>= 2)
 URL: https://r-forge.r-project.org/projects/ctds/
